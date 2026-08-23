@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ứng Dụng Học Từ Vựng Thông Minh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-pink-50 min-h-screen text-gray-800 p-4 sm:p-6">
+    
+    <!-- MODAL ĐĂNG NHẬP / ĐĂNG KÝ -->
+    <div id="authModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-5 border border-pink-100">
+            <div class="text-center space-y-1">
+                <h2 class="text-2xl font-bold text-pink-600">📚 VocabMaster AI</h2>
+                <p id="authModeTitle" class="text-xs text-gray-500">Đăng nhập để đồng bộ dữ liệu sổ tay lên mọi thiết bị</p>
+            </div>
+            
+            <button onclick="loginWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-700 text-sm py-2.5 rounded-xl font-medium border border-gray-300 transition shadow-sm">
+                <svg class="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.2v3.15C3.21 21.34 7.31 24 12 24z"/>
+                    <path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.6H1.2C.44 8.13 0 9.87 0 12s.44 3.87 1.2 5.4l4.07-3.16z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.21 2.66 1.2 6.6l4.07 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/>
+                </svg>
+                Đăng nhập bằng Google
+            </button>
+            <div class="flex items-center my-3">
+                <div class="flex-grow border-t border-gray-200"></div>
+                <span class="px-3 text-xs text-gray-400 uppercase font-medium">Hoặc email</span>
+                <div class="flex-grow border-t border-gray-200"></div>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Email:</label>
+                    <input type="email" id="authEmail" placeholder="Nhập email của bạn..." class="w-full text-sm border border-pink-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 bg-pink-50/20 mt-1">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Mật khẩu:</label>
+                    <input type="password" id="authPassword" placeholder="Nhập mật khẩu..." class="w-full text-sm border border-pink-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 bg-pink-50/20 mt-1">
+                </div>
+                <div id="authError" class="text-xs text-red-500 text-center font-medium hidden"></div>
+            </div>
+            
+            <div class="space-y-2">
+                <button id="authSubmitBtn" onclick="handleAuthSubmit()" class="w-full bg-pink-600 hover:bg-pink-700 text-white text-sm py-2.5 rounded-xl font-medium transition shadow-sm">
+                    Đăng Nhập
+                </button>
+                <div class="flex items-center justify-between text-xs pt-2">
+                    <span id="authSwitchText" class="text-gray-500">Chưa có tài khoản?</span>
+                    <button onclick="toggleAuthMode()" id="authSwitchBtn" class="text-pink-600 font-bold hover:underline">Đăng ký ngay</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- HEADER & API KEY -->
+        <header class="bg-white p-5 rounded-2xl shadow-sm border border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-pink-600 flex items-center gap-2">
+                    📚 VocabMaster AI
+                </h1>
+                <p class="text-sm text-gray-500">Học từ vựng và làm trắc nghiệm kiểm tra thông minh</p>
+            </div>
+            
+            <div class="flex items-center gap-3 flex-wrap">
+                <div id="userInfoBadge" class="hidden items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-xs">
+                    <span>👤 <strong id="userEmailDisplay"></strong></span>
+                    <button onclick="logoutUser()" class="text-red-600 font-bold hover:underline ml-2">Đăng xuất</button>
+                </div>
+                <div class="flex items-center gap-2 bg-pink-50 p-2 rounded-xl border border-pink-200">
+                    <span class="text-xl">🔑</span>
+                    <input type="password" id="apiKeyInput" placeholder="Dán Groq API Key..." 
+                        class="bg-transparent text-sm focus:outline-none px-2 py-1 w-48 sm:w-60">
+                    <button onclick="saveApiKey()" class="bg-pink-600 hover:bg-pink-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition">
+                        Lưu Key
+                    </button>
+                </div>
+            </div>
+        </header>
+        <!-- QUẢN LÝ TỦ ĐỰNG SỔ, SỔ TAY & TRANG -->
+        <section class="bg-white p-4 rounded-2xl shadow-sm border border-pink-100 space-y-4">
+            
+            <!-- TỦ / BÌA ĐỰNG SỔ -->
+            <div class="bg-rose-50/60 p-3 rounded-xl border border-rose-200 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs font-bold text-rose-700 uppercase flex items-center gap-1">🗄️ Tủ / Bìa đựng sổ:</span>
+                        <select id="binderSelect" onchange="switchBinder(this.value)" class="text-xs border border-rose-300 rounded-xl px-3 py-1.5 bg-white font-semibold text-rose-800 focus:outline-none">
+                        </select>
+                        <input type="text" id="searchBinderInput" oninput="filterBinders()" placeholder="🔍 Tìm tủ đựng..." class="text-xs border border-gray-200 rounded-xl px-2.5 py-1.5 bg-white focus:outline-none focus:border-rose-500 w-28 sm:w-36">
+                        
+                        <button onclick="toggleExpandBinders()" class="text-xs bg-rose-200 hover:bg-rose-300 text-rose-900 px-2.5 py-1.5 rounded-xl font-medium transition flex items-center gap-1">
+                            ↕️ Mở rộng tìm tủ
+                        </button>
+                        <button onclick="renameCurrentBinder()" class="text-xs bg-white hover:bg-rose-100 text-rose-800 px-2.5 py-1.5 rounded-xl font-medium border border-rose-200 transition">✏️ Đổi tên tủ</button>
+                        <button onclick="deleteCurrentBinder()" class="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2.5 py-1.5 rounded-xl font-medium transition">🗑️ Xóa tủ</button>
+                        <button onclick="createNewBinder()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl font-medium transition shadow-sm">➕ Tạo tủ đựng mới</button>
+                    </div>
+                    <div class="text-xs text-rose-600 italic font-medium">
+                        🗂️ Đang mở tủ: <strong id="currentBinderNameDisplay" class="text-rose-800">Tủ đựng sổ 1</strong>
+                    </div>
+                </div>
+                <!-- KHU VỰC MỞ RỘNG DANH SÁCH TỦ -->
+                <div id="expandedBindersContainer" class="hidden pt-2 border-t border-rose-200/60 mt-2 space-y-2">
+                    <p class="text-[11px] font-bold text-rose-700">bấm chọn tủ đựng trong danh sách bên dưới:</p>
+                    <div id="expandedBindersGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1">
+                        <!-- Danh sách tủ dạng card -->
+                    </div>
+                </div>
+            </div>
+            <!-- QUẢN LÝ SỔ TAY & TRANG -->
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-bold text-gray-700 uppercase">📖 Sổ tay:</span>
+                    <select id="notebookSelect" onchange="switchNotebook(this.value)" class="text-xs border border-pink-300 rounded-xl px-3 py-1.5 bg-pink-50 font-medium focus:outline-none">
+                    </select>
+                    <input type="text" id="searchNotebookInput" oninput="filterNotebooks()" placeholder="🔍 Tìm sổ..." class="text-xs border border-gray-200 rounded-xl px-2.5 py-1.5 bg-gray-50 focus:outline-none focus:border-pink-500 w-28 sm:w-36">
+                    
+                    <button onclick="toggleExpandNotebooks()" class="text-xs bg-pink-200 hover:bg-pink-300 text-pink-900 px-2.5 py-1.5 rounded-xl font-medium transition flex items-center gap-1">
+                        ↕️ Mở rộng tìm sổ
+                    </button>
+                    <button onclick="renameCurrentNotebook()" class="text-xs bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-xl font-medium transition">✏️ Đổi tên sổ</button>
+                    <button onclick="deleteCurrentNotebook()" class="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2.5 py-1.5 rounded-xl font-medium transition">🗑️ Xóa sổ</button>
+                    <button onclick="createNewNotebook()" class="text-xs bg-pink-600 hover:bg-pink-700 text-white px-3 py-1.5 rounded-xl font-medium transition shadow-sm">➕ Tạo sổ mới</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="createNewPage()" class="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-xl font-medium transition shadow-sm">➕ Thêm trang mới</button>
+                    <button onclick="toggleArchive()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-xl font-medium transition">📦 Sổ lưu trữ (<span id="archiveCount">0</span>)</button>
+                </div>
+            </div>
+            <!-- KHU VỰC MỞ RỘNG DANH SÁCH SỔ TAY -->
+            <div id="expandedNotebooksContainer" class="hidden p-3 bg-pink-50/50 rounded-xl border border-pink-200 space-y-2">
+                <p class="text-[11px] font-bold text-pink-700">bấm chọn sổ tay trong danh sách bên dưới:</p>
+                <div id="expandedNotebooksGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1">
+                    <!-- Danh sách sổ dạng card -->
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-100 pt-3 space-y-2">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">📄 Các trang trong sổ:</span>
+                        <button onclick="toggleExpandPages()" class="text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 px-2.5 py-1 rounded-xl font-medium transition flex items-center gap-1">
+                            ↕️ Xem tất cả trang
+                        </button>
+                    </div>
+                    <input type="text" id="searchPageInput" oninput="renderNotebookUI()" placeholder="🔍 Tìm trang..." class="text-xs border border-gray-200 rounded-xl px-3 py-1 bg-gray-50 focus:outline-none focus:border-pink-500 w-40">
+                </div>
+                <div class="flex items-center gap-2 overflow-x-auto py-1" id="pageTabs"></div>
+                <!-- KHU VỰC MỞ RỘNG DANH SÁCH TRANG -->
+                <div id="expandedPagesContainer" class="hidden p-3 bg-purple-50/50 rounded-xl border border-purple-200 space-y-2">
+                    <p class="text-[11px] font-bold text-purple-700">bấm chọn trang trong danh sách mở rộng bên dưới:</p>
+                    <div id="expandedPagesGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1">
+                        <!-- Danh sách trang dạng card -->
+                    </div>
+                </div>
+            </div>
+            <div id="archiveSection" class="hidden border-t border-gray-100 pt-3 space-y-2">
+                <h3 class="text-xs font-bold text-gray-600 uppercase">📦 Các trang đã cất vào lưu trữ:</h3>
+                <div id="archiveList" class="flex flex-wrap gap-2">
+                    <p class="text-xs text-gray-400 italic">Chưa có trang nào.</p>
+                </div>
+            </div>
+        </section>
+        <!-- NAVIGATION TABS -->
+        <div class="flex gap-2 border-b border-pink-200 pb-2">
+            <button onclick="switchTab('study')" id="tabStudy" class="px-4 py-2 rounded-xl font-medium text-sm bg-pink-600 text-white transition">
+                📖 Danh sách & Học tập
+            </button>
+            <button onclick="switchTab('quiz')" id="tabQuiz" class="px-4 py-2 rounded-xl font-medium text-sm bg-white text-pink-600 hover:bg-pink-100 transition">
+                📝 Làm trắc nghiệm kiểm tra
+            </button>
+        </div>
+        <!-- TAB 1: STUDY -->
+        <div id="sectionStudy" class="space-y-6">
+            <!-- 2 KHU VỰC TẢI FILE: TẢI MỚI & THÊM TIẾP -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- KHU VỰC 1: TẢI FILE MỚI (THAY THẾ HOẶC ĐA TRANG TÍNH) -->
+                <section class="bg-white p-5 rounded-2xl shadow-sm border border-pink-100 text-center flex flex-col justify-between">
+                    <div id="dropZone" class="border-2 border-dashed border-pink-300 hover:border-pink-500 rounded-xl p-5 transition cursor-pointer bg-pink-50/50">
+                        <div class="text-3xl mb-1">📂</div>
+                        <p class="font-medium text-gray-700 text-sm">Tải file Excel (Tự tạo trang theo Sheet)</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Hỗ trợ .xlsx, .xls, .csv, .txt (Đọc tất cả Sheets)</p>
+                        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .txt" class="hidden">
+                    </div>
+                    <div class="mt-3 flex justify-center">
+                        <button onclick="resetStudyProgress()" class="bg-pink-600 hover:bg-pink-700 text-white text-xs px-3 py-1.5 rounded-xl font-medium transition shadow-sm">
+                            🔄 Làm mới ôn tập trang
+                        </button>
+                    </div>
+                </section>
+                <!-- KHU VỰC 2: BỔ SUNG / TIẾP THÊM TỪ VỰNG TỪ FILE -->
+                <section class="bg-white p-5 rounded-2xl shadow-sm border border-purple-100 text-center flex flex-col justify-between">
+                    <div id="appendDropZone" class="border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl p-5 transition cursor-pointer bg-purple-50/50">
+                        <div class="text-3xl mb-1">➕📥</div>
+                        <p class="font-medium text-purple-700 text-sm">Tiếp thêm từ vựng vào trang hiện tại</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Nối tiếp thêm từ mới vào trang đang mở</p>
+                        <input type="file" id="appendFileInput" accept=".xlsx, .xls, .csv, .txt" class="hidden">
+                    </div>
+                    <div class="mt-3 flex justify-center">
+                        <button onclick="archiveCurrentPage()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-1.5 rounded-xl font-medium transition shadow-sm">
+                            📦 Cất trang vào lưu trữ
+                        </button>
+                    </div>
+                </section>
+            </div>
+            
+            <section id="vocabContainer" class="space-y-6">
+                <!-- Danh sách thẻ từ vựng -->
+            </section>
+        </div>
+        <!-- TAB 2: QUIZ -->
+        <div id="sectionQuiz" class="hidden space-y-6">
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-pink-100 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-pink-600">Kiểm tra từ vựng</h2>
+                    <button onclick="startQuiz()" class="bg-pink-600 hover:bg-pink-700 text-white text-sm px-4 py-2 rounded-xl font-medium transition">
+                        🔄 Làm lại bài kiểm tra
+                    </button>
+                </div>
+                <div id="quizContainer" class="space-y-4">
+                    <p class="text-center text-gray-400 py-8">Vui lòng tải file từ vựng ở tab "Danh sách & Học tập" trước!</p>
+                </div>
+            </section>
+        </div>
+    </div>
+    <!-- FIREBASE & LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyCZg7Xmkwqys5Byt81DsJz0XYN1lpGfAl8",
+            authDomain: "tuvung-3df5a.firebaseapp.com",
+            databaseURL: "https://tuvung-3df5a-default-rtdb.firebaseio.com",
+            projectId: "tuvung-3df5a",
+            storageBucket: "tuvung-3df5a.firebasestorage.app",
+            messagingSenderId: "238235336252",
+            appId: "1:238235336252:web:1b6bb845aed852c2fa8d39",
+            measurementId: "G-Z24FDNFKVP"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+        let currentUser = null;
+        let isRegisterMode = false;
+        let isSyncing = false;
+        window.toggleAuthMode = function() {
+            isRegisterMode = !isRegisterMode;
+            document.getElementById('authModeTitle').innerText = isRegisterMode ? "Đăng ký tài khoản mới" : "Đăng nhập để đồng bộ dữ liệu sổ tay lên mọi thiết bị";
+            document.getElementById('authSubmitBtn').innerText = isRegisterMode ? "Đăng Ký" : "Đăng Nhập";
+            document.getElementById('authSwitchText').innerText = isRegisterMode ? "Đã có tài khoản?" : "Chưa có tài khoản?";
+            document.getElementById('authSwitchBtn').innerText = isRegisterMode ? "Đăng nhập ngay" : "Đăng ký ngay";
+            document.getElementById('authError').classList.add('hidden');
+        }
+        window.handleAuthSubmit = async function() {
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            const errEl = document.getElementById('authError');
+            errEl.classList.add('hidden');
+            if (!email || !password) {
+                errEl.innerText = "Vui lòng nhập đầy đủ email và mật khẩu!";
+                errEl.classList.remove('hidden');
+                return;
+            }
+            try {
+                if (isRegisterMode) {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                errEl.innerText = "Lỗi: " + error.message;
+                errEl.classList.remove('hidden');
+            }
+        }
+        window.loginWithGoogle = async function() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                const errEl = document.getElementById('authError');
+                errEl.innerText = "Lỗi đăng nhập Google: " + error.message;
+                errEl.classList.remove('hidden');
+            }
+        }
+        window.logoutUser = async function() {
+            await signOut(auth);
+            localStorage.removeItem('vocab_app_data');
+            localStorage.removeItem('vocab_archived_pages');
+            localStorage.removeItem('vocab_binders_data');
+            location.reload();
+        }
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const modal = document.getElementById('authModal');
+            const badge = document.getElementById('userInfoBadge');
+            const emailDisplay = document.getElementById('userEmailDisplay');
+            if (user) {
+                modal.classList.add('hidden');
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+                emailDisplay.innerText = user.email || user.displayName;
+                
+                const userDbRef = ref(db, 'users/' + user.uid);
+                onValue(userDbRef, (snapshot) => {
+                    if (isSyncing) return;
+                    const val = snapshot.val();
+                    if (val) {
+                        if (val.appData) appData = val.appData;
+                        if (val.archivedPages) archivedPages = val.archivedPages;
+                        if (val.bindersData) bindersData = val.bindersData;
+                    } else {
+                        saveDataToFirebase();
+                    }
+                    appData.forEach(nb => {
+                        if (!nb.binderId) nb.binderId = bindersData[0]?.binderId || 1;
+                    });
+                    if (bindersData.length > 0 && !bindersData.some(b => b.binderId === currentBinderId)) {
+                        currentBinderId = bindersData[0].binderId;
+                    }
+                    const filteredNbs = appData.filter(n => n.binderId === currentBinderId);
+                    if (filteredNbs.length > 0) {
+                        currentNotebookId = filteredNbs[0].notebookId;
+                        if (filteredNbs[0].pages.length > 0) currentPageId = filteredNbs[0].pages[0].pageId;
+                    }
+                    renderBinderUI();
+                    renderNotebookUI();
+                    renderVocabCards();
+                });
+            } else {
+                modal.classList.remove('hidden');
+                badge.classList.add('hidden');
+            }
+        });
+        function saveDataToFirebase() {
+            if (!currentUser) return;
+            isSyncing = true;
+            set(ref(db, 'users/' + currentUser.uid), {
+                appData: appData,
+                archivedPages: archivedPages,
+                bindersData: bindersData
+            }).then(() => {
+                setTimeout(() => { isSyncing = false; }, 500);
+            }).catch(() => {
+                isSyncing = false;
+            });
+        }
+        /* DỮ LIỆU TỦ ĐỰNG SỔ (BINDERS) */
+        window.bindersData = JSON.parse(localStorage.getItem('vocab_binders_data')) || [
+            { binderId: 1, binderName: 'Tủ đựng sổ 1' }
+        ];
+        window.currentBinderId = bindersData[0].binderId;
+        /* DỮ LIỆU SỔ TAY (APP DATA) */
+        window.appData = JSON.parse(localStorage.getItem('vocab_app_data')) || [
+            {
+                binderId: 1,
+                notebookId: 1,
+                notebookName: 'Sổ tay 1',
+                pages: [
+                    { pageId: 101, pageName: 'Trang 1', data: [] }
+                ]
+            }
+        ];
+        appData.forEach(nb => {
+            if (!nb.binderId) nb.binderId = bindersData[0]?.binderId || 1;
+        });
+        window.currentNotebookId = appData[0].notebookId;
+        window.currentPageId = appData[0].pages[0].pageId;
+        window.archivedPages = JSON.parse(localStorage.getItem('vocab_archived_pages')) || [];
+        
+        window.saveData = function() {
+            localStorage.setItem('vocab_app_data', JSON.stringify(appData));
+            localStorage.setItem('vocab_archived_pages', JSON.stringify(archivedPages));
+            localStorage.setItem('vocab_binders_data', JSON.stringify(bindersData));
+            saveDataToFirebase();
+        }
+        /* HÀM MỞ RỘNG DANH SÁCH KHU VỰC TỦ / SỔ / TRANG */
+        window.toggleExpandBinders = function() {
+            const container = document.getElementById('expandedBindersContainer');
+            container.classList.toggle('hidden');
+            if (!container.classList.contains('hidden')) renderExpandedBinders();
+        }
+        window.renderExpandedBinders = function() {
+            const grid = document.getElementById('expandedBindersGrid');
+            if (!grid) return;
+            const searchVal = document.getElementById('searchBinderInput') ? document.getElementById('searchBinderInput').value.trim().toLowerCase() : '';
+            grid.innerHTML = '';
+            
+            bindersData.forEach(b => {
+                if (!searchVal || b.binderName.toLowerCase().includes(searchVal)) {
+                    const isSelected = b.binderId === currentBinderId;
+                    const card = document.createElement('div');
+                    card.className = `p-2.5 rounded-xl border cursor-pointer text-xs font-semibold text-center transition ${isSelected ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-rose-800 border-rose-200 hover:bg-rose-100'}`;
+                    card.innerHTML = `🗄️ ${b.binderName}`;
+                    card.onclick = () => {
+                        switchBinder(b.binderId);
+                    };
+                    grid.appendChild(card);
+                }
+            });
+        }
+        window.toggleExpandNotebooks = function() {
+            const container = document.getElementById('expandedNotebooksContainer');
+            container.classList.toggle('hidden');
+            if (!container.classList.contains('hidden')) renderExpandedNotebooks();
+        }
+        window.renderExpandedNotebooks = function() {
+            const grid = document.getElementById('expandedNotebooksGrid');
+            if (!grid) return;
+            const searchVal = document.getElementById('searchNotebookInput') ? document.getElementById('searchNotebookInput').value.trim().toLowerCase() : '';
+            grid.innerHTML = '';
+            const binderNotebooks = appData.filter(nb => nb.binderId === currentBinderId);
+            binderNotebooks.forEach(nb => {
+                if (!searchVal || nb.notebookName.toLowerCase().includes(searchVal)) {
+                    const isSelected = nb.notebookId === currentNotebookId;
+                    const card = document.createElement('div');
+                    card.className = `p-2.5 rounded-xl border cursor-pointer text-xs font-semibold text-center transition ${isSelected ? 'bg-pink-600 text-white border-pink-600 shadow-sm' : 'bg-white text-pink-800 border-pink-200 hover:bg-pink-100'}`;
+                    card.innerHTML = `📖 ${nb.notebookName}`;
+                    card.onclick = () => {
+                        switchNotebook(nb.notebookId);
+                    };
+                    grid.appendChild(card);
+                }
+            });
+        }
+        window.toggleExpandPages = function() {
+            const container = document.getElementById('expandedPagesContainer');
+            container.classList.toggle('hidden');
+            if (!container.classList.contains('hidden')) renderExpandedPages();
+        }
+        window.renderExpandedPages = function() {
+            const grid = document.getElementById('expandedPagesGrid');
+            if (!grid) return;
+            const searchPageVal = document.getElementById('searchPageInput') ? document.getElementById('searchPageInput').value.trim().toLowerCase() : '';
+            grid.innerHTML = '';
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb) {
+                let filteredPages = nb.pages.filter(pg => !searchPageVal || pg.pageName.toLowerCase().includes(searchPageVal));
+                filteredPages.forEach(pg => {
+                    const isSelected = pg.pageId === currentPageId;
+                    const card = document.createElement('div');
+                    card.className = `p-2.5 rounded-xl border cursor-pointer text-xs font-semibold text-center transition ${isSelected ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-800 border-purple-200 hover:bg-purple-100'}`;
+                    card.innerHTML = `📄 ${pg.pageName}`;
+                    card.onclick = () => {
+                        switchPage(pg.pageId);
+                    };
+                    grid.appendChild(card);
+                });
+            }
+        }
+        /* QUẢN LÝ TỦ ĐỰNG SỔ (BINDER LOGIC) */
+        window.renderBinderUI = function() {
+            const select = document.getElementById('binderSelect');
+            if (!select) return;
+            const searchVal = document.getElementById('searchBinderInput') ? document.getElementById('searchBinderInput').value.trim().toLowerCase() : '';
+            select.innerHTML = '';
+            
+            bindersData.forEach(b => {
+                if (!searchVal || b.binderName.toLowerCase().includes(searchVal)) {
+                    const opt = document.createElement('option');
+                    opt.value = b.binderId;
+                    opt.innerText = b.binderName;
+                    if (b.binderId === currentBinderId) opt.selected = true;
+                    select.appendChild(opt);
+                }
+            });
+            const currentBinder = bindersData.find(b => b.binderId === currentBinderId);
+            const displayEl = document.getElementById('currentBinderNameDisplay');
+            if (displayEl && currentBinder) {
+                displayEl.innerText = currentBinder.binderName;
+            }
+            renderExpandedBinders();
+        }
+        window.filterBinders = function() { renderBinderUI(); }
+        window.switchBinder = function(id) {
+            currentBinderId = Number(id);
+            appData.forEach(nb => { if (!nb.binderId) nb.binderId = bindersData[0]?.binderId || 1; });
+            const filteredNbs = appData.filter(n => n.binderId === currentBinderId);
+            if (filteredNbs.length > 0) {
+                currentNotebookId = filteredNbs[0].notebookId;
+                if (filteredNbs[0].pages.length > 0) currentPageId = filteredNbs[0].pages[0].pageId;
+            } else {
+                const newNb = {
+                    binderId: currentBinderId,
+                    notebookId: Date.now(),
+                    notebookName: 'Sổ tay 1',
+                    pages: [{ pageId: Date.now() + 1, pageName: 'Trang 1', data: [] }]
+                };
+                appData.push(newNb);
+                currentNotebookId = newNb.notebookId;
+                currentPageId = newNb.pages[0].pageId;
+                saveData();
+            }
+            renderBinderUI();
+            renderNotebookUI();
+            renderVocabCards();
+        }
+        window.createNewBinder = function() {
+            const name = prompt('Nhập tên tủ/bìa đựng sổ mới:', `Tủ đựng sổ ${bindersData.length + 1}`);
+            if (name) {
+                const newBinder = {
+                    binderId: Date.now(),
+                    binderName: name.trim()
+                };
+                bindersData.push(newBinder);
+                currentBinderId = newBinder.binderId;
+                const newNb = {
+                    binderId: currentBinderId,
+                    notebookId: Date.now() + 1,
+                    notebookName: 'Sổ tay 1',
+                    pages: [{ pageId: Date.now() + 2, pageName: 'Trang 1', data: [] }]
+                };
+                appData.push(newNb);
+                currentNotebookId = newNb.notebookId;
+                currentPageId = newNb.pages[0].pageId;
+                saveData();
+                renderBinderUI();
+                renderNotebookUI();
+                renderVocabCards();
+            }
+        }
+        window.renameCurrentBinder = function() {
+            const binder = bindersData.find(b => b.binderId === currentBinderId);
+            if (binder) {
+                const newName = prompt('Đổi tên tủ/bìa đựng sổ hiện tại:', binder.binderName);
+                if (newName) {
+                    binder.binderName = newName.trim();
+                    saveData();
+                    renderBinderUI();
+                }
+            }
+        }
+        window.deleteCurrentBinder = function() {
+            if (bindersData.length <= 1) {
+                alert('Cần giữ lại ít nhất một tủ/bìa đựng sổ trong ứng dụng!');
+                return;
+            }
+            const binder = bindersData.find(b => b.binderId === currentBinderId);
+            if (confirm(`Bạn có chắc chắn muốn xóa tủ/bìa "${binder.binderName}" cùng tất cả các sổ tay bên trong không?`)) {
+                appData = appData.filter(n => n.binderId !== currentBinderId);
+                bindersData = bindersData.filter(b => b.binderId !== currentBinderId);
+                currentBinderId = bindersData[0].binderId;
+                const filteredNbs = appData.filter(n => n.binderId === currentBinderId);
+                if (filteredNbs.length > 0) {
+                    currentNotebookId = filteredNbs[0].notebookId;
+                    currentPageId = filteredNbs[0].pages[0].pageId;
+                } else {
+                    const newNb = {
+                        binderId: currentBinderId,
+                        notebookId: Date.now(),
+                        notebookName: 'Sổ tay 1',
+                        pages: [{ pageId: Date.now() + 1, pageName: 'Trang 1', data: [] }]
+                    };
+                    appData.push(newNb);
+                    currentNotebookId = newNb.notebookId;
+                    currentPageId = newNb.pages[0].pageId;
+                }
+                saveData();
+                renderBinderUI();
+                renderNotebookUI();
+                renderVocabCards();
+                alert('Đã xóa tủ đựng sổ thành công!');
+            }
+        }
+        window.getCurrentPageData = function() {
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (!nb) return [];
+            const pg = nb.pages.find(p => p.pageId === currentPageId);
+            return pg ? pg.data : [];
+        }
+        window.saveCurrentPageData = function(newData) {
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb) {
+                const pg = nb.pages.find(p => p.pageId === currentPageId);
+                if (pg) {
+                    pg.data = newData;
+                    saveData();
+                }
+            }
+        }
+        window.resetStudyProgress = function() {
+            if (confirm("Bạn có muốn xóa sạch các phần đã điền để bắt đầu ôn tập lại từ đầu không?")) {
+                const vocabList = getCurrentPageData();
+                vocabList.forEach(item => {
+                    item.posInput = "";
+                    item.meaningInput = "";
+                    item.wordInput = "";
+                    item.exampleInput = "";
+                });
+                saveCurrentPageData(vocabList);
+                renderVocabCards();
+            }
+        }
+        window.renderNotebookUI = function() {
+            appData.forEach(nb => { if (!nb.binderId) nb.binderId = bindersData[0]?.binderId || 1; });
+            const select = document.getElementById('notebookSelect');
+            const searchVal = document.getElementById('searchNotebookInput').value.trim().toLowerCase();
+            select.innerHTML = '';
+            
+            const binderNotebooks = appData.filter(nb => nb.binderId === currentBinderId);
+            binderNotebooks.forEach(nb => {
+                if (!searchVal || nb.notebookName.toLowerCase().includes(searchVal)) {
+                    const opt = document.createElement('option');
+                    opt.value = nb.notebookId;
+                    opt.innerText = nb.notebookName;
+                    if (nb.notebookId === currentNotebookId) opt.selected = true;
+                    select.appendChild(opt);
+                }
+            });
+            let nb = binderNotebooks.find(n => n.notebookId === currentNotebookId);
+            if (!nb && binderNotebooks.length > 0) {
+                currentNotebookId = binderNotebooks[0].notebookId;
+                nb = binderNotebooks[0];
+                if (nb.pages.length > 0) currentPageId = nb.pages[0].pageId;
+            }
+            const pageTabs = document.getElementById('pageTabs');
+            pageTabs.innerHTML = '';
+            
+            const searchPageVal = document.getElementById('searchPageInput').value.trim().toLowerCase();
+            if (nb) {
+                let filteredPages = nb.pages.filter(pg => !searchPageVal || pg.pageName.toLowerCase().includes(searchPageVal));
+                if (filteredPages.length === 0) {
+                    pageTabs.innerHTML = `<span class="text-xs text-gray-400 italic">Không tìm thấy trang phù hợp.</span>`;
+                }
+                filteredPages.forEach(pg => {
+                    const isActive = pg.pageId === currentPageId;
+                    const btn = document.createElement('div');
+                    btn.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer border ${isActive ? 'bg-pink-600 text-white border-pink-600 shadow-sm' : 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100'}`;
+                    btn.innerHTML = `
+                        <span onclick="switchPage(${pg.pageId})">📄 ${pg.pageName}</span>
+                        <button onclick="renamePage(${pg.pageId}, event)" class="opacity-70 hover:opacity-100 ml-1" title="Đổi tên trang">✏️</button>
+                        <button onclick="deletePage(${pg.pageId}, event)" class="opacity-70 hover:opacity-100 text-red-200 hover:text-red-500 ml-0.5" title="Xóa trang">🗑️</button>
+                    `;
+                    pageTabs.appendChild(btn);
+                });
+            }
+            document.getElementById('archiveCount').innerText = archivedPages.length;
+            renderArchiveList();
+            renderExpandedNotebooks();
+            renderExpandedPages();
+        }
+        window.filterNotebooks = function() { renderNotebookUI(); }
+        window.switchNotebook = function(id) {
+            currentNotebookId = Number(id);
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb && nb.pages.length > 0) currentPageId = nb.pages[0].pageId;
+            renderNotebookUI();
+            renderVocabCards();
+        }
+        window.createNewNotebook = function() {
+            const binderNotebooks = appData.filter(n => n.binderId === currentBinderId);
+            const name = prompt('Nhập tên cuốn sổ mới:', `Sổ tay ${binderNotebooks.length + 1}`);
+            if (name) {
+                const newNb = {
+                    binderId: currentBinderId,
+                    notebookId: Date.now(),
+                    notebookName: name.trim(),
+                    pages: [{ pageId: Date.now() + 1, pageName: 'Trang 1', data: [] }]
+                };
+                appData.push(newNb);
+                currentNotebookId = newNb.notebookId;
+                currentPageId = newNb.pages[0].pageId;
+                saveData();
+                renderNotebookUI();
+                renderVocabCards();
+            }
+        }
+        window.renameCurrentNotebook = function() {
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb) {
+                const newName = prompt('Đổi tên cuốn sổ hiện tại:', nb.notebookName);
+                if (newName) { nb.notebookName = newName.trim(); saveData(); renderNotebookUI(); }
+            }
+        }
+        window.deleteCurrentNotebook = function() {
+            const binderNotebooks = appData.filter(n => n.binderId === currentBinderId);
+            if (binderNotebooks.length <= 1) { alert('Cần giữ lại ít nhất một cuốn sổ tay trong tủ đựng sổ này!'); return; }
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (confirm(`Bạn có chắc chắn muốn xóa cuốn sổ "${nb.notebookName}" cùng toàn bộ các trang bên trong không?`)) {
+                appData = appData.filter(n => n.notebookId !== currentNotebookId);
+                const remaining = appData.filter(n => n.binderId === currentBinderId);
+                currentNotebookId = remaining[0].notebookId;
+                currentPageId = remaining[0].pages[0].pageId;
+                saveData();
+                renderNotebookUI();
+                renderVocabCards();
+                alert('Đã xóa sổ tay thành công!');
+            }
+        }
+        window.createNewPage = function() {
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb) {
+                const name = prompt('Nhập tên trang mới:', `Trang ${nb.pages.length + 1}`);
+                if (name) {
+                    const newPg = { pageId: Date.now(), pageName: name.trim(), data: [] };
+                    nb.pages.push(newPg);
+                    currentPageId = newPg.pageId;
+                    saveData();
+                    renderNotebookUI();
+                    renderVocabCards();
+                }
+            }
+        }
+        window.renamePage = function(pageId, e) {
+            e.stopPropagation();
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            const pg = nb?.pages.find(p => p.pageId === pageId);
+            if (pg) {
+                const newName = prompt('Đổi tên trang:', pg.pageName);
+                if (newName) { pg.pageName = newName.trim(); saveData(); renderNotebookUI(); }
+            }
+        }
+        window.deletePage = function(pageId, e) {
+            e.stopPropagation();
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb) {
+                if (nb.pages.length <= 1) { alert('Mỗi sổ tay cần giữ lại ít nhất 1 trang!'); return; }
+                const pg = nb.pages.find(p => p.pageId === pageId);
+                if (confirm(`Bạn có chắc chắn muốn xóa trang "${pg.pageName}" này không?`)) {
+                    nb.pages = nb.pages.filter(p => p.pageId !== pageId);
+                    currentPageId = nb.pages[0].pageId;
+                    saveData();
+                    renderNotebookUI();
+                    renderVocabCards();
+                }
+            }
+        }
+        window.switchPage = function(pageId) { currentPageId = pageId; renderNotebookUI(); renderVocabCards(); }
+        window.archiveCurrentPage = function() {
+            const nb = appData.find(n => n.notebookId === currentNotebookId);
+            if (nb && nb.pages.length <= 1) { alert('Mỗi sổ tay cần giữ lại ít nhất 1 trang hiện hành!'); return; }
+            const pgIndex = nb.pages.findIndex(p => p.pageId === currentPageId);
+            if (pgIndex !== -1) {
+                const archived = nb.pages.splice(pgIndex, 1)[0];
+                archivedPages.push({ notebookName: nb.notebookName, page: archived });
+                currentPageId = nb.pages[0].pageId;
+                saveData();
+                renderNotebookUI();
+                renderVocabCards();
+                alert(`Đã cất trang "${archived.pageName}" vào lưu trữ!`);
+            }
+        }
+        window.toggleArchive = function() { document.getElementById('archiveSection').classList.toggle('hidden'); }
+        window.renderArchiveList = function() {
+            const listEl = document.getElementById('archiveList');
+            listEl.innerHTML = '';
+            if (archivedPages.length === 0) { listEl.innerHTML = `<p class="text-xs text-gray-400 italic">Chưa có trang nào.</p>`; return; }
+            archivedPages.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-50 border border-gray-200 rounded-xl p-2 flex items-center justify-between gap-3 text-xs";
+                div.innerHTML = `
+                    <span>📁 [${item.notebookName}] <strong>${item.page.pageName}</strong> (${item.page.data.length} từ)</span>
+                    <div class="flex gap-1">
+                        <button onclick="restorePage(${idx})" class="bg-pink-600 text-white px-2.5 py-1 rounded-lg hover:bg-pink-700 transition">Khôi phục</button>
+                        <button onclick="deleteArchivedPage(${idx})" class="bg-red-100 text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-200 transition">Xóa</button>
+                    </div>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+        window.restorePage = function(idx) {
+            const item = archivedPages.splice(idx, 1)[0];
+            let nb = appData.find(n => n.notebookName === item.notebookName);
+            if (!nb) {
+                nb = { binderId: currentBinderId, notebookId: Date.now(), notebookName: item.notebookName, pages: [] };
+                appData.push(nb);
+            }
+            nb.pages.push(item.page);
+            currentNotebookId = nb.notebookId;
+            currentPageId = item.page.pageId;
+            saveData();
+            renderNotebookUI();
+            renderVocabCards();
+            alert(`Đã khôi phục trang thành công!`);
+        }
+        window.deleteArchivedPage = function(idx) {
+            if (confirm('Bạn có muốn xóa vĩnh viễn trang này khỏi lưu trữ không?')) {
+                archivedPages.splice(idx, 1);
+                saveData();
+                renderArchiveList();
+            }
+        }
+        // Xử lý sự kiện kéo thả và chọn file (TẢI ĐA TRANG TÍNH / NHIỀU SHEETS) - Cập nhật 5 cột
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleMultiSheetFile(e.target.files[0], false); });
+        // Xử lý sự kiện kéo thả và chọn file (BỔ SUNG / TIẾP THÊM)
+        const appendDropZone = document.getElementById('appendDropZone');
+        const appendFileInput = document.getElementById('appendFileInput');
+        appendDropZone.addEventListener('click', () => appendFileInput.click());
+        appendFileInput.addEventListener('change', (e) => { if (e.target.files.length) handleAppendFile(e.target.files[0]); });
+        
+        window.handleMultiSheetFile = function(file) {
+            const reader = new FileReader();
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'xlsx' || ext === 'xls') {
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    const nb = appData.find(n => n.notebookId === currentNotebookId);
+                    if (!nb) return;
+                    let addedSheetsCount = 0;
+                    workbook.SheetNames.forEach((sheetName, index) => {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                        let list = [];
+                        rows.forEach(row => {
+                            if (row.length >= 1 && row[0]) {
+                                list.push({
+                                    word: row[0] ? row[0].toString().trim() : '',       // Cột 1: Từ tiếng Anh
+                                    phonetic: row[1] ? row[1].toString().trim() : '', // Cột 2: Phiên âm
+                                    pos: row[2] ? row[2].toString().trim() : '',       // Cột 3: Loại từ
+                                    meaning: row[3] ? row[3].toString().trim() : '',   // Cột 4: Nghĩa gốc
+                                    example: row[4] ? row[4].toString().trim() : ''    // Cột 5: Ví dụ / Câu mẫu
+                                });
+                            }
+                        });
+                        if (list.length > 0) {
+                            if (index === 0 && nb.pages.length === 1 && nb.pages[0].data.length === 0) {
+                                nb.pages[0].pageName = sheetName;
+                                nb.pages[0].data = list;
+                                currentPageId = nb.pages[0].pageId;
+                            } else {
+                                const newPg = { pageId: Date.now() + index, pageName: sheetName, data: list };
+                                nb.pages.push(newPg);
+                                if (index === 0) currentPageId = newPg.pageId;
+                            }
+                            addedSheetsCount++;
+                        }
+                    });
+                    saveData();
+                    renderNotebookUI();
+                    renderVocabCards();
+                    alert(`Đã đọc thành công ${workbook.SheetNames.length} trang tính (sheets) và tạo tương ứng ${addedSheetsCount} trang trong sổ!`);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = (e) => {
+                    const rows = e.target.result.split('\n').map(r => r.split(/,|\t/));
+                    parseDataToCurrentPage(rows, false);
+                };
+                reader.readAsText(file);
+            }
+        }
+        window.handleAppendFile = function(file) {
+            const reader = new FileReader();
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'xlsx' || ext === 'xls') {
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    let totalAdded = 0;
+                    workbook.SheetNames.forEach(sheetName => {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                        rows.forEach(row => {
+                            if (row.length >= 1 && row[0]) {
+                                const currentList = getCurrentPageData();
+                                currentList.push({
+                                    word: row[0] ? row[0].toString().trim() : '',
+                                    phonetic: row[1] ? row[1].toString().trim() : '',
+                                    pos: row[2] ? row[2].toString().trim() : '',
+                                    meaning: row[3] ? row[3].toString().trim() : '',
+                                    example: row[4] ? row[4].toString().trim() : ''
+                                });
+                                totalAdded++;
+                            }
+                        });
+                    });
+                    saveCurrentPageData(getCurrentPageData());
+                    renderVocabCards();
+                    alert(`Đã tiếp thêm thành công ${totalAdded} từ vào trang hiện tại!`);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = (e) => {
+                    const rows = e.target.result.split('\n').map(r => r.split(/,|\t/));
+                    parseDataToCurrentPage(rows, true);
+                };
+                reader.readAsText(file);
+            }
+        }
+        window.parseDataToCurrentPage = function(rows, isAppend = false) {
+            let list = [];
+            rows.forEach(row => {
+                if (row.length >= 1 && row[0]) {
+                    list.push({
+                        word: row[0] ? row[0].toString().trim() : '',
+                        phonetic: row[1] ? row[1].toString().trim() : '',
+                        pos: row[2] ? row[2].toString().trim() : '',
+                        meaning: row[3] ? row[3].toString().trim() : '',
+                        example: row[4] ? row[4].toString().trim() : ''
+                    });
+                }
+            });
+            let currentList = getCurrentPageData();
+            let finalList = isAppend ? [...currentList, ...list] : list;
+            
+            saveCurrentPageData(finalList);
+            renderVocabCards();
+            if (isAppend) {
+                alert(`Đã tiếp thêm thành công ${list.length} từ vào trang hiện tại!`);
+            } else {
+                alert(`Đã tải thành công ${list.length} từ vào trang này!`);
+            }
+        }
+        window.handleEnterKey = function(event, currentIndex, fieldType) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                let nextElement = null;
+                if (fieldType === 'pos') {
+                    nextElement = document.getElementById(`meaning_${currentIndex}`);
+                } else if (fieldType === 'meaning') {
+                    nextElement = document.getElementById(`wordInput_${currentIndex}`);
+                } else if (fieldType === 'wordInput') {
+                    nextElement = document.getElementById(`example_${currentIndex}`);
+                } else if (fieldType === 'example') {
+                    nextElement = document.getElementById(`pos_${currentIndex + 1}`);
+                }
+                if (nextElement) {
+                    nextElement.focus();
+                }
+            }
+        }
+        window.renderVocabCards = function() {
+            const container = document.getElementById('vocabContainer');
+            container.innerHTML = '';
+            const vocabList = getCurrentPageData();
+            if (vocabList.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-400 py-6">Trang này chưa có từ vựng nào.</p>`;
+                return;
+            }
+            vocabList.forEach((item, index) => {
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = 'bg-white p-6 rounded-2xl shadow-sm border border-pink-100 space-y-4';
+                const mainKeyword = item.word.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '');
+                const imgIcon = `https://api.iconify.design/fluent-emoji-flat:${mainKeyword}.svg`;
+                
+                const hasFilledWord = item.wordInput && item.wordInput.trim().length > 0;
+                const wordTitleStyle = hasFilledWord ? 'hidden' : '';
+                
+                // Hiển thị ví dụ từ file Excel hoặc từ AI gợi ý
+                const displayExample = item.example ? item.example : (item.aiHintSentence ? item.aiHintSentence : 'Chưa cập nhật');
+
+                cardWrapper.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="text-lg font-bold text-gray-700">${index + 1}.</span>
+                                <img src="${imgIcon}" onerror="this.src='https://api.iconify.design/fluent-emoji-flat:books.svg'" class="w-7 h-7 object-contain">
+                                <div class="flex flex-col">
+                                    <h3 id="word_title_${index}" class="text-xl font-bold text-pink-600 ${wordTitleStyle}">${item.word}</h3>
+                                    <span id="phonetic_text_${index}" class="text-xs text-gray-500 font-mono italic">${item.phonetic ? '/' + item.phonetic + '/' : ''}</span>
+                                </div>
+                                <span class="text-xs bg-pink-50 text-pink-700 px-2.5 py-1 rounded-lg border border-pink-200">Cách dùng: N / V / Adj / Adv</span>
+                                <button onclick="toggleCardHint(${index})" class="bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1">
+                                    💡 Lật xem nghĩa & gợi ý
+                                </button>
+                            </div>
+                            <button onclick="speakWord('${item.word}')" class="text-sm bg-pink-50 hover:bg-pink-100 text-pink-600 px-4 py-2 rounded-xl font-medium transition flex items-center gap-2 w-fit">
+                                🔊 Phát âm
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="space-y-1">
+                                <label class="text-xs font-semibold text-gray-600">Nhập loại từ:</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="pos_${index}" value="${item.posInput || ''}" oninput="checkPos(${index}, '${item.pos}')" onkeydown="handleEnterKey(event, ${index}, 'pos')" placeholder="Nhập loại từ..." 
+                                        class="flex-1 text-sm border border-pink-200 rounded-xl px-3 py-2 focus:outline-none focus:border-pink-500 bg-pink-50/20">
+                                </div>
+                                <div id="pos_check_${index}" class="text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] ${item.posInput ? '' : 'hidden'}"></div>
+                                <div id="hint_pos_${index}" class="hidden text-xs bg-amber-50 border border-amber-200 p-2 rounded-xl text-amber-900 mt-1">
+                                    💡 Gợi ý: <strong>${item.pos || 'Chưa cập nhật'}</strong>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-semibold text-gray-600">Nhập nghĩa tiếng Việt:</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="meaning_${index}" value="${item.meaningInput || ''}" oninput="checkMeaning(${index}, '${item.meaning}')" onkeydown="handleEnterKey(event, ${index}, 'meaning')" placeholder="Nhập nghĩa..." 
+                                        class="flex-1 text-sm border border-pink-200 rounded-xl px-3 py-2 focus:outline-none focus:border-pink-500 bg-pink-50/20">
+                                </div>
+                                <div id="meaning_check_${index}" class="text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] ${item.meaningInput ? '' : 'hidden'}"></div>
+                                <div id="hint_meaning_${index}" class="hidden text-xs bg-amber-50 border border-amber-200 p-2 rounded-xl text-amber-900 mt-1 space-y-1">
+                                    <div>🔒 Nghĩa gốc: <strong>${item.meaning || 'Chưa cập nhật'}</strong></div>
+                                    <div>✨ Câu mẫu: <span id="sample_text_${index}">${displayExample}</span></div>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-semibold text-gray-600">Nhập tiếng Anh:</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="wordInput_${index}" value="${item.wordInput || ''}" oninput="checkWordInput(${index}, '${item.word}')" onkeydown="handleEnterKey(event, ${index}, 'wordInput')" placeholder="Nhập từ Anh..." 
+                                        class="flex-1 text-sm border border-pink-200 rounded-xl px-3 py-2 focus:outline-none focus:border-pink-500 bg-pink-50/20">
+                                </div>
+                                <div id="word_check_${index}" class="text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] ${item.wordInput ? '' : 'hidden'}"></div>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-2xl border border-pink-200 bg-pink-50/30 space-y-3">
+                            <label class="text-xs font-bold text-gray-700">✍️ Tự viết câu ví dụ (AI phân tích đúng/sai):</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="example_${index}" value="${item.exampleInput || ''}" oninput="saveExampleInput(${index}, this.value)" onkeydown="handleEnterKey(event, ${index}, 'example')" placeholder="Viết câu tiếng Anh..." class="flex-1 text-sm border border-pink-200 rounded-xl px-4 py-2 bg-white focus:outline-none focus:border-pink-500">
+                                <button onclick="analyzeExample(${index})" class="bg-pink-600 hover:bg-pink-700 text-white text-sm px-5 py-2 rounded-xl font-medium transition">Kiểm tra lỗi</button>
+                            </div>
+                            <div id="ai_result_${index}" class="hidden text-xs bg-white p-3 rounded-xl border border-pink-200 text-gray-700 space-y-1"></div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(cardWrapper);
+            });
+        }
+        window.saveExampleInput = function(index, val) {
+            const vocabList = getCurrentPageData();
+            vocabList[index].exampleInput = val;
+            saveCurrentPageData(vocabList);
+        }
+        window.toggleCardHint = async function(index) {
+            const hintPos = document.getElementById(`hint_pos_${index}`);
+            const hintMeaning = document.getElementById(`hint_meaning_${index}`);
+            
+            hintPos.classList.toggle('hidden');
+            hintMeaning.classList.toggle('hidden');
+            const vocabList = getCurrentPageData();
+            
+            // Nếu chưa có câu mẫu từ Excel và chưa có AI hint thì gọi API tạo câu mẫu
+            if (!hintMeaning.classList.contains('hidden') && !vocabList[index].example && !vocabList[index].aiHintSentence) {
+                const sampleEl = document.getElementById(`sample_text_${index}`);
+                sampleEl.innerText = "Đang tạo câu mẫu...";
+                const apiKey = localStorage.getItem('groq_api_key');
+                if (!apiKey) { sampleEl.innerText = "Cần nhập API Key ở trên để lấy câu mẫu!"; return; }
+                try {
+                    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: 'llama-3.3-70b-versatile',
+                            messages: [{ role: 'user', content: `Cho 1 câu ví dụ tiếng Anh cực ngắn gọn kèm dịch nghĩa tiếng Việt cho từ/cụm từ "${vocabList[index].word}".` }]
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.choices && data.choices[0].message) {
+                        vocabList[index].aiHintSentence = data.choices[0].message.content;
+                        sampleEl.innerHTML = vocabList[index].aiHintSentence.replace(/\n/g, '<br>');
+                        saveCurrentPageData(vocabList);
+                    }
+                } catch (e) {
+                    sampleEl.innerText = "Không tải được câu mẫu.";
+                }
+            }
+        }
+        window.checkPos = function(index, correctPos) {
+            const val = document.getElementById(`pos_${index}`).value.trim().toLowerCase();
+            const badge = document.getElementById(`pos_check_${index}`);
+            const vocabList = getCurrentPageData();
+            vocabList[index].posInput = val;
+            saveCurrentPageData(vocabList);
+            if (!val) { badge.innerText = ""; badge.className = "hidden"; return; }
+            badge.classList.remove('hidden');
+            if (correctPos && val.includes(correctPos.toLowerCase())) {
+                badge.className = "text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] bg-green-100 text-green-700";
+                badge.innerText = "✅ Đúng";
+            } else {
+                badge.className = "text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] bg-red-100 text-red-700";
+                badge.innerText = "❌ Sai";
+            }
+        }
+        window.checkMeaning = function(index, correctMeaning) {
+            const val = document.getElementById(`meaning_${index}`).value.trim().toLowerCase();
+            const badge = document.getElementById(`meaning_check_${index}`);
+            const vocabList = getCurrentPageData();
+            vocabList[index].meaningInput = val;
+            saveCurrentPageData(vocabList);
+            if (!val) { badge.innerText = ""; badge.className = "hidden"; return; }
+            badge.classList.remove('hidden');
+            if (correctMeaning && (correctMeaning.toLowerCase().includes(val) || val.includes(correctMeaning.toLowerCase()))) {
+                badge.className = "text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] bg-green-100 text-green-700";
+                badge.innerText = "✅ Đúng";
+            } else {
+                badge.className = "text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] bg-red-100 text-red-700";
+                badge.innerText = "❌ Xem lại";
+            }
+        }
+        window.checkWordInput = function(index, correctWord) {
+            const val = document.getElementById(`wordInput_${index}`).value.trim().toLowerCase();
+            const badge = document.getElementById(`word_check_${index}`);
+            const wordTitle = document.getElementById(`word_title_${index}`);
+            const vocabList = getCurrentPageData();
+            vocabList[index].wordInput = val;
+            saveCurrentPageData(vocabList);
+            
+            if (val.length > 0) {
+                wordTitle.classList.add('hidden');
+            } else {
+                wordTitle.classList.remove('hidden');
+            }
+            if (!val) { badge.innerText = ""; badge.className = "hidden"; return; }
+            badge.classList.remove('hidden');
+            if (correctWord && (correctWord.toLowerCase() === val)) {
+                badge.className = "text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] bg-green-100 text-green-700";
+                badge.innerText = "✅ Đúng";
+            } else {
+                badge.className = "text-xs font-bold px-2 py-1 rounded-xl text-center min-w-[70px] bg-red-100 text-red-700";
+                badge.innerText = "❌ Xem lại";
+            }
+        }
+        window.speakWord = function(word) {
+            const cleanWord = encodeURIComponent(word.trim());
+            const audioUrl = `https://dict.youdao.com/dictvoice?audio=${cleanWord}&type=1`;
+            const audio = new Audio(audioUrl);
+            audio.play().catch(() => {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(word);
+                    utterance.lang = 'en-US';
+                    window.speechSynthesis.speak(utterance);
+                }
+            });
+        }
+        window.analyzeExample = async function(index) {
+            const apiKey = localStorage.getItem('groq_api_key');
+            if (!apiKey) { alert('Vui lòng nhập Groq API Key!'); return; }
+            const vocabList = getCurrentPageData();
+            const word = vocabList[index].word;
+            const sentence = document.getElementById(`example_${index}`).value.trim();
+            const resultBox = document.getElementById(`ai_result_${index}`);
+            if (!sentence) { alert('Vui lòng nhập câu ví dụ!'); return; }
+            resultBox.classList.remove('hidden');
+            resultBox.innerHTML = '⏳ AI đang phân tích đúng/sai...';
+            try {
+                const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({
+                        model: 'llama-3.3-70b-versatile',
+                        messages: [{ role: 'user', content: `Phân tích câu ví dụ tiếng Anh cho cụm từ "${word}": "${sentence}". Kiểm tra ngữ pháp xem đúng hay sai, cách dùng hợp lý chưa, chỉ rõ lỗi và gợi ý câu sửa.` }]
+                    })
+                });
+                const data = await res.json();
+                resultBox.innerHTML = `<strong>💡 AI Phân tích:</strong><br>` + data.choices[0].message.content.replace(/\n/g, '<br>');
+            } catch (e) {
+                resultBox.innerHTML = `<span class="text-red-500">Lỗi kết nối AI.</span>`;
+            }
+        }
+        window.saveApiKey = function() {
+            localStorage.setItem('groq_api_key', document.getElementById('apiKeyInput').value.trim());
+            alert('Đã lưu Key thành công!');
+        }
+        window.switchTab = function(tab) {
+            document.getElementById('sectionStudy').classList.toggle('hidden', tab !== 'study');
+            document.getElementById('sectionQuiz').classList.toggle('hidden', tab !== 'quiz');
+            document.getElementById('tabStudy').className = tab === 'study' ? "px-4 py-2 rounded-xl font-medium text-sm bg-pink-600 text-white transition" : "px-4 py-2 rounded-xl font-medium text-sm bg-white text-pink-600 hover:bg-pink-100 transition";
+            document.getElementById('tabQuiz').className = tab === 'quiz' ? "px-4 py-2 rounded-xl font-medium text-sm bg-pink-600 text-white transition" : "px-4 py-2 rounded-xl font-medium text-sm bg-white text-pink-600 hover:bg-pink-100 transition";
+            if(tab === 'quiz') startQuiz();
+        }
+        window.startQuiz = function() {
+            const container = document.getElementById('quizContainer');
+            const vocabList = getCurrentPageData();
+            if (vocabList.length < 2) {
+                container.innerHTML = `<p class="text-center text-red-400 py-4">Cần ít nhất 2 từ vựng trong trang này để làm trắc nghiệm!</p>`;
+                return;
+            }
+            let html = '';
+            let shuffled = [...vocabList].sort(() => 0.5 - Math.random());
+            shuffled.forEach((item, qIdx) => {
+                let wrongs = vocabList.filter(v => v.meaning !== item.meaning && v.meaning).sort(() => 0.5 - Math.random()).slice(0, 3);
+                let opts = [...wrongs, item].sort(() => 0.5 - Math.random());
+                html += `<div class="p-4 rounded-xl border border-pink-100 bg-pink-50/30 space-y-2">
+                    <p class="font-bold text-gray-800">Câu ${qIdx + 1}: Nghĩa của từ <span class="text-pink-600">"${item.word}"</span> là gì?</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">`;
+                opts.forEach((o, oIdx) => {
+                    const correct = o.meaning === item.meaning ? 'true' : 'false';
+                    html += `<button onclick="checkQuizAns(this, ${correct})" class="text-left text-sm p-3 rounded-xl border border-pink-200 bg-white hover:bg-pink-100 transition">${String.fromCharCode(65 + oIdx)}. ${o.meaning}</button>`;
+                });
+                html += `</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+        window.checkQuizAns = function(btn, correct) {
+            const parent = btn.parentElement;
+            parent.querySelectorAll('button').forEach(b => b.disabled = true);
+            btn.className = correct ? "text-left text-sm p-3 rounded-xl border border-green-300 bg-green-100 text-green-800 font-medium" : "text-left text-sm p-3 rounded-xl border border-red-300 bg-red-100 text-red-800 font-medium";
+            if (!correct) {
+                parent.querySelectorAll('button').forEach(b => {
+                    if (b.getAttribute('onclick').includes('true')) b.className = "text-left text-sm p-3 rounded-xl border border-green-300 bg-green-100 text-green-800 font-medium";
+                });
+            }
+        }
+        renderBinderUI();
+        renderNotebookUI();
+        renderVocogCards ? renderVocabCards() : renderVocabCards();
+    </script>
+</body>
+</html>
